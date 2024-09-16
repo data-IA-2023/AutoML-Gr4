@@ -1,0 +1,12 @@
+python-dotenv
+sqlalchemy
+scikit-learn
+fastapi
+flask
+libsass
+pandas
+uvicorn
+python-multipart
+jinja2
+pandas
+seaborn
