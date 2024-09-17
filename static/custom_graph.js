@@ -46,7 +46,9 @@ function drawAllNodes() {
   ctx.fillStyle = "rgb(200, 200, 200)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (var i = 0; i < nodes.length; i++) {
-    drawNode(nodes[i].pos[0], nodes[i].pos[1],nodes[i].name,nodes[i].color,"",nodes[i].size,i);
+    if (i != CurrentNode) {
+        drawNode(nodes[i].pos[0], nodes[i].pos[1],nodes[i].name,nodes[i].color,"",nodes[i].size,i);
+    }
     for (var j = 0; j < nodes[i].outputs.length; j++) {
       ctx.strokeStyle = "green"; // Set stroke color to green
       ctx.lineWidth = 2;
