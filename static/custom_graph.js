@@ -78,6 +78,7 @@ function removeElement(arr, element) {
 let isDragging = false;
 let isResizing = false;
 let isDraggingSpace = false;
+let isMakingConection = false;
 // let relativeX, relativeY;
 let startX, startY;
 let x_pos, y_pos;
@@ -169,6 +170,45 @@ function deleteNode(node_index) {
   nodeToBeDeleted=node_index;
 }
 
+function newConection(conection) {
+  nodes[conection[0]].outputs.push(conection[1]);
+}
+
+function editNewConection(dummy) {
+  isMakingConection = true;
+}
+
+function drawNewConection(node_index,mouse_pos) {
+  drawAllNodes()
+  node=nodes[node_index]
+  ctx.strokeStyle = "green"; // Set stroke color to green
+  ctx.lineWidth = 2;
+  path_start=termByTermSum(node.pos,[node.size.x, node.size.y/2+1+10]);
+  ctx.beginPath();
+  ctx.moveTo(path_start[0],path_start[1]); // starting point
+  ctx.lineTo(mouse_pos[0],mouse_pos[1]); // end point
+  ctx.stroke();
+}
+
+function deleteNodeRoutine() {
+  if (nodeToBeDeleted>-1) {
+    nodes.splice(nodeToBeDeleted,1);
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].outputs=removeElement(nodes[i].outputs,nodeToBeDeleted);
+    }
+    for (var i = 0; i < nodes.length; i++) {
+      for (var j = 0; j < nodes[i].outputs.length; j++) {
+        if (nodes[i].outputs[j] > nodeToBeDeleted) {
+          nodes[i].outputs[j]=nodes[i].outputs[j]-1;
+        }
+      }
+    }
+    nodeToBeDeleted=-1;
+    currentNode=0;
+    drawAllNodes()
+  };
+}
+
 function changeColor(node) {
   nodes[node].color=getRandomHexRGB();
 }
@@ -199,6 +239,7 @@ canvas.addEventListener('mousedown', (event) => {
         y_pos=nodes[i].pos[1];
         fixedPosArr[i]=[startX-x_pos,startY-y_pos];
         for (var j = 0; j < nodes[i].outputs.length; j++) {
+          // Conection selection
           pos1=[nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+1+10];
           pos2=[nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+1+10];
           vec=termByTermDiff(pos2,pos1);
@@ -218,20 +259,31 @@ canvas.addEventListener('mousedown', (event) => {
           }
         }
         if (startX-x_pos >= 0 && startX-x_pos <= nodes[i].size.x && startY-y_pos >= 0 && startY-y_pos <= nodes[i].size.y+20) {
-          currentNode=i;
+          // Node selection
           voidClick=false;
           relativeX = startX-x_pos;
           relativeY = startY-y_pos;
+          if (isMakingConection && relativeX <= 10 && relativeY >= nodes[currentNode].size.y/2+6 && relativeY <= nodes[currentNode].size.y/2+16) {
+            newConection([currentNode,i])
+          }
+          currentNode=i;
           drawAllNodes()
           if (relativeY <= 20) {
               isDragging = true;
               drawContext(startX,startY,["🎨 Change color","🗑️ Delete node"],160);
               contextActions = [[changeColor,currentNode],[deleteNode,currentNode]];
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeY >= nodes[currentNode].size.y-10) {
-              isResizing = true;
-          }
+            // resizing  
+            isResizing = true;
+          } else if (relativeX >= nodes[currentNode].size.x-10 && relativeX <= nodes[currentNode].size.x && relativeY >= nodes[currentNode].size.y/2+6 && relativeY <= nodes[currentNode].size.y/2+16) {
+            // add conection
+            drawContext(startX,startY,["➕ Add conection"],160);
+            contextActions = [[editNewConection,""]];
+          } 
         }
+
       }
+      isMakingConection=false;
     }
     if (voidClick) {
         isDraggingSpace=true;
@@ -239,22 +291,7 @@ canvas.addEventListener('mousedown', (event) => {
         drawContext(startX,startY,["➕ Add new node"],160);
         contextActions = [[newNode,{name:"new node",pos:[startX,startY]}]];
     }
-    if (nodeToBeDeleted>-1) {
-      nodes.splice(nodeToBeDeleted,1);
-      for (var i = 0; i < nodes.length; i++) {
-        nodes[i].outputs=removeElement(nodes[i].outputs,nodeToBeDeleted);
-      }
-      for (var i = 0; i < nodes.length; i++) {
-        for (var j = 0; j < nodes[i].outputs.length; j++) {
-          if (nodes[i].outputs[j] > nodeToBeDeleted) {
-            nodes[i].outputs[j]=nodes[i].outputs[j]-1;
-          }
-        }
-      }
-      nodeToBeDeleted=-1;
-      currentNode=0;
-      drawAllNodes()
-    };
+    deleteNodeRoutine()
 });
 
 canvas.addEventListener('mousemove', (event) => {
@@ -273,13 +310,16 @@ canvas.addEventListener('mousemove', (event) => {
     if (isResizing) {
         nodes[currentNode].size.x = event.clientX - canvas.offsetLeft-nodes[currentNode].pos[0];
         nodes[currentNode].size.y = event.clientY - canvas.offsetTop-nodes[currentNode].pos[1]-20;
-        if (nodes[currentNode].size.x < 80) {
-            nodes[currentNode].size.x=80
+        if (nodes[currentNode].size.x < 90) {
+            nodes[currentNode].size.x=90
         }
         if (nodes[currentNode].size.y < 50) {
             nodes[currentNode].size.y=50
         }
         drawAllNodes()
+    }
+    if (isMakingConection) {
+      drawNewConection(currentNode,[event.clientX - canvas.offsetLeft,event.clientY - canvas.offsetTop])
     }
 });
 
