@@ -1,9 +1,7 @@
 const canvas = document.getElementById('graphCanvas');
 const parentElement = document.getElementById('graphDiv');
-const parentWidth = parentElement.clientWidth;
-const parentHeight = parentElement.clientHeight;
-canvas.width = parentWidth;
-canvas.height = parentHeight;
+canvas.width = parentElement.clientWidth;
+canvas.height = parentElement.clientHeight
 const ctx = canvas.getContext('2d');
 
 function getRandomHexRGB() {
@@ -125,6 +123,8 @@ function drawNode(x, y, name, color, content, size, id) {
 
 function drawAllNodes() {
   //ctx.clearRect(0, 0, canvas.width, canvas.height);
+  canvas.width = parentElement.clientWidth;
+  canvas.height = parentElement.clientHeight
   contextBox = [-9999,-9999,-9999,-9999];
   ctx.fillStyle = "rgb(200, 200, 200)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
