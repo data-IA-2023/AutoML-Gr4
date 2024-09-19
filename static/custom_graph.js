@@ -3,6 +3,39 @@ const parentElement = document.getElementById('graphDiv');
 canvas.width = parentElement.clientWidth;
 canvas.height = parentElement.clientHeight
 const ctx = canvas.getContext('2d');
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+const session_uid = getCookie('session');
+const currentPageUrl = window.location.href;
+const rootUrl = currentPageUrl.split('/')[2];
+
+var currentNode=0;
+
+function defineSessionData(data) {
+  nodes=data.nodes;
+  currentNode=data.current_node;
+  drawAllNodes()
+}
+
+
+console.log(rootUrl);
+
+// var nodes=[{pos:[10,10],outputs:[1,2],name:"node 1",color:getRandomHexRGB(),size:{x:200,y:100}},
+// {pos:[250,10],outputs:[],name:"node 2",color:getRandomHexRGB(),size:{x:200,y:100}},
+// {pos:[250,210],outputs:[3],name:"node 3",color:getRandomHexRGB(),size:{x:200,y:100}},
+// {pos:[500,210],outputs:[],name:"node 4",color:getRandomHexRGB(),size:{x:200,y:100}}
+// ];
+
+var nodes=[];
+
+fetch('/data/get_graph/' + session_uid) //1
+  .then((response) => response.json()) //2
+  .then((data) => {
+    defineSessionData(data); //3
+});
 
 function getRandomHexRGB() {
   const letters = '0123456789ABCDEF';
@@ -87,12 +120,7 @@ let contextBox = [-9999,-9999,-9999,-9999];
 let contextActions = [];
 let nodeToBeDeleted = -1;
 
-var nodes=[{pos:[10,10],outputs:[1,2],name:"node 1",color:getRandomHexRGB(),size:{x:200,y:100}},
-{pos:[250,10],outputs:[],name:"node 2",color:getRandomHexRGB(),size:{x:200,y:100}},
-{pos:[250,210],outputs:[3],name:"node 3",color:getRandomHexRGB(),size:{x:200,y:100}},
-{pos:[500,210],outputs:[],name:"node 4",color:getRandomHexRGB(),size:{x:200,y:100}}
-];
-var currentNode=0;
+//var subMenu = false;
 let voidClick;
 
 for (var i = 0; i < nodes.length; i++) {
@@ -183,7 +211,7 @@ function drawNewConection(node_index,mouse_pos) {
   node=nodes[node_index]
   ctx.strokeStyle = "green"; // Set stroke color to green
   ctx.lineWidth = 2;
-  path_start=termByTermSum(node.pos,[node.size.x, node.size.y/2+1+10]);
+  path_start=termByTermSum(node.pos,[node.size.x, node.size.y/2+11]);
   ctx.beginPath();
   ctx.moveTo(path_start[0],path_start[1]); // starting point
   ctx.lineTo(mouse_pos[0],mouse_pos[1]); // end point
@@ -216,7 +244,11 @@ function changeColor(node) {
 function newNode(name_and_pos) {
   const name=name_and_pos.name;
   var pos=name_and_pos.pos;
+  //subMenu = true;
   nodes.push({pos:pos,outputs:[],name:name,color:getRandomHexRGB(),size:{x:200,y:100}});
+  if (nodes.length === 0) {
+    currentNode=0;
+  }
 }
 
 // Handle mouse events
@@ -225,6 +257,7 @@ canvas.addEventListener('mousedown', (event) => {
     startY = event.clientY - canvas.offsetTop;
     voidClick=true;
     if (startX >= contextBox[0] && startX <= contextBox[1] && startY >= contextBox[2] && startY <= contextBox[3]) {
+      // Context menu
       voidClick=false;
       for (var i = 0; i < contextActions.length; i++) {
         if (Math.floor((startY-contextBox[2])/20) === i) {
@@ -240,11 +273,10 @@ canvas.addEventListener('mousedown', (event) => {
         fixedPosArr[i]=[startX-x_pos,startY-y_pos];
         for (var j = 0; j < nodes[i].outputs.length; j++) {
           // Conection selection
-          pos1=[nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+1+10];
-          pos2=[nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+1+10];
+          pos1=[nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+11];
+          pos2=[nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+11];
           vec=termByTermDiff(pos2,pos1);
           mouse_vec1=termByTermDiff([startX,startY],pos1);
-          // mouse_vec2=termByTermDiff(pos2,[startX,startY]);
           proj_vec=vectorProduct(scalarProduct(mouse_vec1,vec)/euclideanNorm(vec)/euclideanNorm(vec), vec);
           ortho_vec=termByTermDiff(mouse_vec1,proj_vec);
           const tol=5;
@@ -263,7 +295,7 @@ canvas.addEventListener('mousedown', (event) => {
           voidClick=false;
           relativeX = startX-x_pos;
           relativeY = startY-y_pos;
-          if (isMakingConection && relativeX <= 10 && relativeY >= nodes[currentNode].size.y/2+6 && relativeY <= nodes[currentNode].size.y/2+16) {
+          if (isMakingConection && relativeX <= 10 && relativeY >= nodes[i].size.y/2+6 && relativeY <= nodes[i].size.y/2+16) {
             newConection([currentNode,i])
           }
           currentNode=i;
@@ -327,6 +359,13 @@ canvas.addEventListener('mouseup', () => {
     isDragging = false;
     isResizing = false;
     isDraggingSpace = false;
+    fetch('/api/graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({nodes:nodes,uid:session_uid,current_node:currentNode})
+    })
+    .then(response => response.json())
+    .then(data => console.log(data));
 });
 
 drawAllNodes()

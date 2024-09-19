@@ -10,3 +10,4 @@ python-multipart
 jinja2
 pandas
 seaborn
+flask-cors
