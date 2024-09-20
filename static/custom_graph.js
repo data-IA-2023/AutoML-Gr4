@@ -20,14 +20,7 @@ function defineSessionData(data) {
   drawAllNodes()
 }
 
-
 console.log(rootUrl);
-
-// var nodes=[{pos:[10,10],outputs:[1,2],name:"node 1",color:getRandomHexRGB(),size:{x:200,y:100}},
-// {pos:[250,10],outputs:[],name:"node 2",color:getRandomHexRGB(),size:{x:200,y:100}},
-// {pos:[250,210],outputs:[3],name:"node 3",color:getRandomHexRGB(),size:{x:200,y:100}},
-// {pos:[500,210],outputs:[],name:"node 4",color:getRandomHexRGB(),size:{x:200,y:100}}
-// ];
 
 var nodes=[];
 
@@ -246,13 +239,20 @@ function newNode(name_and_pos) {
   var pos=name_and_pos.pos;
   //subMenu = true;
   nodes.push({pos:pos,outputs:[],name:name,color:getRandomHexRGB(),size:{x:200,y:100}});
-  if (nodes.length === 0) {
+  if (nodes.length === 1) {
     currentNode=0;
   }
 }
 
+// prevent browser context menu
+canvas.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
+});
+
+
 // Handle mouse events
 canvas.addEventListener('mousedown', (event) => {
+    event.preventDefault();
     startX = event.clientX - canvas.offsetLeft;
     startY = event.clientY - canvas.offsetTop;
     voidClick=true;
@@ -271,23 +271,25 @@ canvas.addEventListener('mousedown', (event) => {
         x_pos=nodes[i].pos[0];
         y_pos=nodes[i].pos[1];
         fixedPosArr[i]=[startX-x_pos,startY-y_pos];
-        for (var j = 0; j < nodes[i].outputs.length; j++) {
-          // Conection selection
-          pos1=[nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+11];
-          pos2=[nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+11];
-          vec=termByTermDiff(pos2,pos1);
-          mouse_vec1=termByTermDiff([startX,startY],pos1);
-          proj_vec=vectorProduct(scalarProduct(mouse_vec1,vec)/euclideanNorm(vec)/euclideanNorm(vec), vec);
-          ortho_vec=termByTermDiff(mouse_vec1,proj_vec);
-          const tol=5;
-          if (euclideanNorm(ortho_vec)<tol && (startY-tol <= Math.max(pos1[1],pos2[1])) && (startY+tol >= Math.min(pos1[1],pos2[1])) && (startX-tol <= Math.max(pos1[0],pos2[0])) && (startX+tol >= Math.min(pos1[0],pos2[0]))) {
-              voidClick=false;
-              drawAllNodes()
-              drawContext(startX,startY,["🗑️ Delete conection"],200);
-              let i_copy=JSON.parse(JSON.stringify(i));
-              let j_copy=JSON.parse(JSON.stringify(nodes[i].outputs[j]));
-              conection=[i_copy,j_copy];
-              contextActions = [[deleteConection,conection]];
+        if (event.button === 2) {
+          for (var j = 0; j < nodes[i].outputs.length; j++) {
+            // Conection selection
+            pos1=[nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+11];
+            pos2=[nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+11];
+            vec=termByTermDiff(pos2,pos1);
+            mouse_vec1=termByTermDiff([startX,startY],pos1);
+            proj_vec=vectorProduct(scalarProduct(mouse_vec1,vec)/euclideanNorm(vec)/euclideanNorm(vec), vec);
+            ortho_vec=termByTermDiff(mouse_vec1,proj_vec);
+            const tol=5;
+            if (euclideanNorm(ortho_vec)<tol && (startY-tol <= Math.max(pos1[1],pos2[1])) && (startY+tol >= Math.min(pos1[1],pos2[1])) && (startX-tol <= Math.max(pos1[0],pos2[0])) && (startX+tol >= Math.min(pos1[0],pos2[0]))) {
+                voidClick=false;
+                drawAllNodes()
+                drawContext(startX,startY,["🗑️ Delete conection"],200);
+                let i_copy=JSON.parse(JSON.stringify(i));
+                let j_copy=JSON.parse(JSON.stringify(nodes[i].outputs[j]));
+                conection=[i_copy,j_copy];
+                contextActions = [[deleteConection,conection]];
+            }
           }
         }
         if (startX-x_pos >= 0 && startX-x_pos <= nodes[i].size.x && startY-y_pos >= 0 && startY-y_pos <= nodes[i].size.y+20) {
@@ -301,15 +303,15 @@ canvas.addEventListener('mousedown', (event) => {
           currentNode=i;
           drawAllNodes()
           if (relativeY <= 20) {
-              isDragging = true;
-              drawContext(startX,startY,["🎨 Change color","🗑️ Delete node"],160);
+              if (event.button === 2) {drawContext(startX,startY,["🎨 Change color","🗑️ Delete node"],160);}
+              else {isDragging = true;}
               contextActions = [[changeColor,currentNode],[deleteNode,currentNode]];
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeY >= nodes[currentNode].size.y-10) {
             // resizing  
             isResizing = true;
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeX <= nodes[currentNode].size.x && relativeY >= nodes[currentNode].size.y/2+6 && relativeY <= nodes[currentNode].size.y/2+16) {
             // add conection
-            drawContext(startX,startY,["➕ Add conection"],160);
+            if (event.button === 2) {drawContext(startX,startY,["➕ Add conection"],160);}
             contextActions = [[editNewConection,""]];
           } 
         }
@@ -318,9 +320,9 @@ canvas.addEventListener('mousedown', (event) => {
       isMakingConection=false;
     }
     if (voidClick) {
-        isDraggingSpace=true;
         drawAllNodes()
-        drawContext(startX,startY,["➕ Add new node"],160);
+        if (event.button === 2) {drawContext(startX,startY,["➕ Add new node"],160);}
+        else {isDraggingSpace=true;}
         contextActions = [[newNode,{name:"new node",pos:[startX,startY]}]];
     }
     deleteNodeRoutine()
