@@ -23,9 +23,10 @@ def post_example():
     sessions[data['uid']]={'nodes':data['nodes'],'current_node':data['current_node']}
     return jsonify(message="POST request returned")
 
-@app.route('/data/get_graph/<uid>', methods=["GET"])
-def get_graph(uid):
+@app.route('/data/get_graph', methods=["GET"])
+def get_graph():
     print(sessions)
+    uid=request.cookies.get('session')
     data = sessions[uid]
     response = jsonify(data)
     response.headers['Content-Type'] = 'application/json'

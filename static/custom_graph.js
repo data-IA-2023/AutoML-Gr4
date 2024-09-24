@@ -24,7 +24,7 @@ console.log(rootUrl);
 
 var nodes=[];
 
-fetch('/data/get_graph/' + session_uid) //1
+fetch('/data/get_graph') //1
   .then((response) => response.json()) //2
   .then((data) => {
     defineSessionData(data); //3
@@ -109,11 +109,10 @@ let isMakingConection = false;
 let startX, startY;
 let x_pos, y_pos;
 let fixedPosArr = [];
-let contextBox = [-9999,-9999,-9999,-9999];
-let contextActions = [];
+let contextBox = [];
+let contextActions = [[]];
 let nodeToBeDeleted = -1;
 
-//var subMenu = false;
 let voidClick;
 
 for (var i = 0; i < nodes.length; i++) {
@@ -147,7 +146,7 @@ function drawAllNodes() {
   //ctx.clearRect(0, 0, canvas.width, canvas.height);
   canvas.width = parentElement.clientWidth;
   canvas.height = parentElement.clientHeight
-  contextBox = [-9999,-9999,-9999,-9999];
+  // contextBox = [-9999,-9999,-9999,-9999];
   ctx.fillStyle = "rgb(200, 200, 200)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (var i = 0; i < nodes.length; i++) {
@@ -168,7 +167,11 @@ function drawAllNodes() {
   }
 }
 
-function drawContext(x,y,options,width) {
+function drawContext(args) {
+    x=args.x
+    y=args.y
+    options=args.options
+    width=args.width
     drawRectangle(x-2, y-2, width+4, options.length*20+4, 'black')
     for (var i = 0; i < options.length; i++) {
       if ((i)%2 === 0){
@@ -180,7 +183,7 @@ function drawContext(x,y,options,width) {
       ctx.font = "bold 18px Arial";
       ctx.fillText(options[i], x+2, i*20+y+16);
     }
-    contextBox = [x,x+width,y,y+options.length*20];
+    contextBox.push([x,x+width,y,y+options.length*20]);
 }
 
 function deleteConection(conection) {
@@ -197,6 +200,8 @@ function newConection(conection) {
 
 function editNewConection(dummy) {
   isMakingConection = true;
+  contextActions=[]
+  contextBox=[]
 }
 
 function drawNewConection(node_index,mouse_pos) {
@@ -226,12 +231,17 @@ function deleteNodeRoutine() {
     }
     nodeToBeDeleted=-1;
     currentNode=0;
+    contextActions=[]
+    contextBox=[]
     drawAllNodes()
   };
 }
 
 function changeColor(node) {
   nodes[node].color=getRandomHexRGB();
+  contextActions=[]
+  contextBox=[]
+  drawAllNodes()
 }
 
 function newNode(name_and_pos) {
@@ -242,6 +252,9 @@ function newNode(name_and_pos) {
   if (nodes.length === 1) {
     currentNode=0;
   }
+  contextActions=[]
+  contextBox=[]
+  drawAllNodes()
 }
 
 // prevent browser context menu
@@ -256,17 +269,23 @@ canvas.addEventListener('mousedown', (event) => {
     startX = event.clientX - canvas.offsetLeft;
     startY = event.clientY - canvas.offsetTop;
     voidClick=true;
-    if (startX >= contextBox[0] && startX <= contextBox[1] && startY >= contextBox[2] && startY <= contextBox[3]) {
-      // Context menu
-      voidClick=false;
-      for (var i = 0; i < contextActions.length; i++) {
-        if (Math.floor((startY-contextBox[2])/20) === i) {
-          contextActions[i][0](contextActions[i][1])
+    for (var i = 0; i < contextBox.length; i++) {
+      if (startX >= contextBox[i][0] && startX <= contextBox[i][1] && startY >= contextBox[i][2] && startY <= contextBox[i][3]) {
+        // Context menu
+        voidClick=false;
+        console.log(contextBox)
+        console.log(contextActions[i])
+        console.log(i)
+        for (var j = 0; j < contextActions[i].length; j++) {
+          if (Math.floor((startY-contextBox[i][2])/20) === j) {
+            contextActions[i][j][0](contextActions[i][j][1])
+            break;
+          }
         }
-      }
-      drawAllNodes()
-    } else {
-      contextBox = [-9999,-9999,-9999,-9999];
+      } 
+    }
+    if (voidClick) {
+      // contextBox = [];
       for (var i = 0; i < nodes.length; i++) {
         x_pos=nodes[i].pos[0];
         y_pos=nodes[i].pos[1];
@@ -284,11 +303,11 @@ canvas.addEventListener('mousedown', (event) => {
             if (euclideanNorm(ortho_vec)<tol && (startY-tol <= Math.max(pos1[1],pos2[1])) && (startY+tol >= Math.min(pos1[1],pos2[1])) && (startX-tol <= Math.max(pos1[0],pos2[0])) && (startX+tol >= Math.min(pos1[0],pos2[0]))) {
                 voidClick=false;
                 drawAllNodes()
-                drawContext(startX,startY,["🗑️ Delete conection"],200);
+                drawContext({x:startX,y:startY,options:["🗑️ Delete conection"],width:200});
                 let i_copy=JSON.parse(JSON.stringify(i));
                 let j_copy=JSON.parse(JSON.stringify(nodes[i].outputs[j]));
                 conection=[i_copy,j_copy];
-                contextActions = [[deleteConection,conection]];
+                contextActions = [[[deleteConection,conection]]];
             }
           }
         }
@@ -303,16 +322,22 @@ canvas.addEventListener('mousedown', (event) => {
           currentNode=i;
           drawAllNodes()
           if (relativeY <= 20) {
-              if (event.button === 2) {drawContext(startX,startY,["🎨 Change color","🗑️ Delete node"],160);}
+              if (event.button === 2) {
+                contextBox=[]
+                drawContext({x:startX,y:startY,options:["🎨 Change color","🗑️ Delete node"],width:160})
+                contextActions = [[[changeColor,currentNode],[deleteNode,currentNode]]];
+                }
               else {isDragging = true;}
-              contextActions = [[changeColor,currentNode],[deleteNode,currentNode]];
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeY >= nodes[currentNode].size.y-10) {
             // resizing  
             isResizing = true;
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeX <= nodes[currentNode].size.x && relativeY >= nodes[currentNode].size.y/2+6 && relativeY <= nodes[currentNode].size.y/2+16) {
             // add conection
-            if (event.button === 2) {drawContext(startX,startY,["➕ Add conection"],160);}
-            contextActions = [[editNewConection,""]];
+            if (event.button === 2) {
+              contextBox=[]
+              drawContext({x:startX,y:startY,options:["➕ Add conection"],width:160});
+              contextActions = [[[editNewConection,""]]];
+            }
           } 
         }
 
@@ -321,9 +346,11 @@ canvas.addEventListener('mousedown', (event) => {
     }
     if (voidClick) {
         drawAllNodes()
-        if (event.button === 2) {drawContext(startX,startY,["➕ Add new node"],160);}
+        contextActions=[]
+        contextBox=[]
+        if (event.button === 2) {drawContext({x:startX,y:startY,options:["➕ Add new node"],width:160});}
         else {isDraggingSpace=true;}
-        contextActions = [[newNode,{name:"new node",pos:[startX,startY]}]];
+        contextActions = [[[drawContext,{x:startX+160,y:startY,options:["➕ Add new node"],width:160}]],[[newNode,{name:"new node",pos:[startX,startY]}]]];
     }
     deleteNodeRoutine()
 });
@@ -361,13 +388,15 @@ canvas.addEventListener('mouseup', () => {
     isDragging = false;
     isResizing = false;
     isDraggingSpace = false;
-    fetch('/api/graph', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({nodes:nodes,uid:session_uid,current_node:currentNode})
-    })
-    .then(response => response.json())
-    .then(data => console.log(data));
+    if (nodes.length != 0) {
+      fetch('/api/graph', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({nodes:nodes,uid:session_uid,current_node:currentNode})
+      })
+      .then(response => response.json())
+      .then(data => console.log(data));
+    }
 });
 
 drawAllNodes()
