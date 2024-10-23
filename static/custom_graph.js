@@ -3,32 +3,69 @@ const parentElement = document.getElementById('graphDiv');
 canvas.width = parentElement.clientWidth;
 canvas.height = parentElement.clientHeight
 const ctx = canvas.getContext('2d');
+
 function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
 }
+
 const session_uid = getCookie('session');
 const currentPageUrl = window.location.href;
 const rootUrl = currentPageUrl.split('/')[2];
 
 var currentNode=0;
+var task_finished=1;
 
 function defineSessionData(data) {
   nodes=data.nodes;
   currentNode=data.current_node;
+  task_finished=data.task_finished;
+  //console.log(data.task_finished)
   drawAllNodes()
 }
 
-console.log(rootUrl);
+// console.log(rootUrl);
 
 var nodes=[];
 
-fetch('/data/get_graph') //1
-  .then((response) => response.json()) //2
-  .then((data) => {
-    defineSessionData(data); //3
-});
+var refreshInterval = 300000;
+let refreshTimer;
+
+function fetchData() {
+  fetch('/api/get_graph')
+    .then((response) => response.json())
+    .then((data) => {
+      defineSessionData(data);
+      clearInterval(refreshTimer);
+      refreshTimer = setInterval(fetchData, refreshInterval);
+      refreshInterval=refreshInterval*2;
+      //console.log(task_finished);
+      if (refreshInterval > 300000 || task_finished === 1) {
+        refreshInterval = 300000;
+      }
+      //console.log(refreshInterval);
+    })
+    .catch((error) => {
+      // Handle errors
+      console.error('Error fetching data:', error);
+    });
+}
+
+fetchData()
+
+function uploadGraph(node_execute) {
+  if (nodes.length != 0) {
+    //console.log(task_finished)
+    fetch('/api/upload_graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({nodes:nodes,uid:session_uid,current_node:currentNode,execute:node_execute,task_finished:task_finished})
+    })
+    .then(response => response.json())
+    .then(data => console.log(data));
+  }
+}
 
 function getRandomHexRGB() {
   const letters = '0123456789ABCDEF';
@@ -125,8 +162,8 @@ function drawRectangle(x, y, size_x, size_y, color) {
     ctx.fillRect(x, y, size_x, size_y);
 }
 
-function drawNode(x, y, name, color, content, size, id) {
-  drawRectangle(x-2, y-2, size.x+4, size.y+4+20, 'black')
+function drawNode(x, y, name, color, content, size, id, type, node_settings) {
+  // drawRectangle(x-2, y-2, size.x+4, size.y+4+20, 'black')
   if (id === currentNode) {
     drawRectangle(x-2, y-2, size.x+4, size.y+4+20, 'white')
   } else {
@@ -140,6 +177,146 @@ function drawNode(x, y, name, color, content, size, id) {
   drawRectangle(x+size.x-10, y+10+size.y, 10, 10, 'black')
   drawRectangle(x-2, y+size.y/2+6, 10, 10, 'green')
   drawRectangle(x+size.x-8, y+size.y/2+6, 10, 10, 'green')
+  if (id === currentNode) {
+    ctx.fillStyle = "white";
+    ctx.font = "bold 18px Arial";
+    ctx.fillText('▶️', x+size.x-94, y+17)
+    ctx.fillText('execute', x+size.x-72, y+16)
+  }
+  switch (type) {
+    case 'source':
+      drawRectangle(x+10, y+30, 140, 24, 'black')
+      drawRectangle(x+12, y+32, 136, 20, 'grey')
+      ctx.fillStyle = "white";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText('Choose source', x+14, y+48)
+      content_array=content.split("\n");
+      ctx.font = "bold 18px Courier New";
+      var content_width=0;
+      for (var i=0; i<content_array.length; i++) {
+        content_width=Math.max(ctx.measureText(content_array[i]).width,content_width);
+      }
+      // console.log(content_width)
+      content_width=Math.floor(content_width);
+      drawRectangle(x+10, y+60, content_width+8, 20*content_array.length+4, 'black')
+      for (var i=0; i<content_array.length; i++) {
+        if ((i)%2 === 0) {
+          drawRectangle(x+12, y+62+20*i, content_width+4, 20, 'white')
+        } else {
+          drawRectangle(x+12, y+62+20*i, content_width+4, 20, 'rgb(240, 240, 240)')
+        }
+      }
+      //drawRectangle(x+12, y+62, content_width+4, 20*content_array.length, 'white')
+      ctx.fillStyle = "black";
+      for (var i=0; i<content_array.length; i++) {
+        ctx.fillText(content_array[i], x+14, y+78+i*20)
+      }
+      // ctx.fillText(nodes[id].content, x+14, y+68)
+      break;
+    case 'filter':
+      drawRectangle(x+10, y+30, 140, 24, 'black')
+      drawRectangle(x+12, y+32, 136, 20, 'grey')
+      ctx.fillStyle = "white";
+      ctx.fillText('Set filter', x+14, y+48)
+      var settings_width=Math.floor(ctx.measureText(node_settings).width);
+      drawRectangle(x+10,y+56,settings_width+8,24,'black')
+      drawRectangle(x+12,y+58,settings_width+4,20,'grey')
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(node_settings, x+14, y+74)
+      content_array=content.split("\n");
+      ctx.font = "bold 18px Courier New";
+      var content_width=0;
+      for (var i=0; i<content_array.length; i++) {
+        content_width=Math.max(ctx.measureText(content_array[i]).width,content_width);
+      }
+      // console.log(content_width)
+      content_width=Math.floor(content_width);
+      drawRectangle(x+10, y+82, content_width+8, 20*content_array.length+4, 'black')
+      for (var i=0; i<content_array.length; i++) {
+        if ((i)%2 === 0) {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'white')
+        } else {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'rgb(240, 240, 240)')
+        }
+      }
+      ctx.fillStyle = "black";
+      for (var i=0; i<content_array.length; i++) {
+        ctx.fillText(content_array[i], x+14, y+100+i*20)
+      }
+      break;
+    case 'columns_select':
+      drawRectangle(x+10, y+30, 140, 24, 'black')
+      drawRectangle(x+12, y+32, 136, 20, 'grey')
+      ctx.fillStyle = "white";
+      ctx.fillText('Select columns', x+14, y+48)
+      var settings_width=Math.floor(ctx.measureText(node_settings).width);
+      drawRectangle(x+10,y+56,settings_width+8,24,'black')
+      drawRectangle(x+12,y+58,settings_width+4,20,'grey')
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(node_settings, x+14, y+74)
+      content_array=content.split("\n");
+      ctx.font = "bold 18px Courier New";
+      var content_width=0;
+      for (var i=0; i<content_array.length; i++) {
+        content_width=Math.max(ctx.measureText(content_array[i]).width,content_width);
+      }
+      // console.log(content_width)
+      content_width=Math.floor(content_width);
+      drawRectangle(x+10, y+82, content_width+8, 20*content_array.length+4, 'black')
+      for (var i=0; i<content_array.length; i++) {
+        if ((i)%2 === 0) {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'white')
+        } else {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'rgb(240, 240, 240)')
+        }
+      }
+      ctx.fillStyle = "black";
+      for (var i=0; i<content_array.length; i++) {
+        ctx.fillText(content_array[i], x+14, y+100+i*20)
+      }
+      break;
+    case 'concatenate':
+      drawRectangle(x+10, y+30, 140, 24, 'black')
+      drawRectangle(x+12, y+32, 136, 20, 'grey')
+      drawRectangle(x+160, y+30, 140, 24, 'black')
+      drawRectangle(x+162, y+32, 136, 20, 'grey')
+      ctx.fillStyle = "white";
+      ctx.fillText('Swap axis', x+14, y+48)
+      ctx.fillText('Change join mode', x+164, y+48)
+      var settings_text='axis : ' + node_settings.axis + ', join mode : ' + node_settings.join;
+      var settings_width=Math.floor(ctx.measureText(settings_text).width);
+      drawRectangle(x+10,y+56,settings_width+8,24,'black')
+      drawRectangle(x+12,y+58,settings_width+4,20,'grey')
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(settings_text, x+14, y+74)
+      content_array=content.split("\n");
+      ctx.font = "bold 18px Courier New";
+      var content_width=0;
+      for (var i=0; i<content_array.length; i++) {
+        content_width=Math.max(ctx.measureText(content_array[i]).width,content_width);
+      }
+      // console.log(content_width)
+      content_width=Math.floor(content_width);
+      drawRectangle(x+10, y+82, content_width+8, 20*content_array.length+4, 'black')
+      for (var i=0; i<content_array.length; i++) {
+        if ((i)%2 === 0) {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'white')
+        } else {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'rgb(240, 240, 240)')
+        }
+      }
+      ctx.fillStyle = "black";
+      for (var i=0; i<content_array.length; i++) {
+        ctx.fillText(content_array[i], x+14, y+100+i*20)
+      }
+      break;
+    default:
+      console.log('Unknown node');
+      break;
+  }
 }
 
 function drawAllNodes() {
@@ -150,20 +327,26 @@ function drawAllNodes() {
   ctx.fillStyle = "rgb(200, 200, 200)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (var i = 0; i < nodes.length; i++) {
+    //console.log(i)
+    //console.log(nodes[i].content)
     if (i != currentNode) {
-        drawNode(nodes[i].pos[0], nodes[i].pos[1],nodes[i].name,nodes[i].color,"",nodes[i].size,i);
+        drawNode(nodes[i].pos[0], nodes[i].pos[1],nodes[i].name,nodes[i].color,nodes[i].content,nodes[i].size,i,nodes[i].type,nodes[i].settings);
     }
+    
     for (var j = 0; j < nodes[i].outputs.length; j++) {
+      // draws cennections
       ctx.strokeStyle = "green"; // Set stroke color to green
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+1+10); // starting point
       ctx.lineTo(nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+1+10); // end point
+      //drawArrow(nodes[i].pos[0]+nodes[i].size.x+2, nodes[i].pos[1]+nodes[i].size.y/2+1+10, nodes[nodes[i].outputs[j]].pos[0], nodes[nodes[i].outputs[j]].pos[1]+nodes[nodes[i].outputs[j]].size.y/2+1+10, 25)
       ctx.stroke();
     }
   }
   if (nodes.length > 0) {
-    drawNode(nodes[currentNode].pos[0], nodes[currentNode].pos[1],nodes[currentNode].name,nodes[currentNode].color,"",nodes[currentNode].size,currentNode);
+    // draws selected node
+    drawNode(nodes[currentNode].pos[0], nodes[currentNode].pos[1],nodes[currentNode].name,nodes[currentNode].color,nodes[currentNode].content,nodes[currentNode].size,currentNode,nodes[currentNode].type,nodes[currentNode].settings);
   }
 }
 
@@ -188,10 +371,21 @@ function drawContext(args) {
 
 function deleteConection(conection) {
   nodes[conection[0]].outputs=removeElement(nodes[conection[0]].outputs,conection[1]);
+  drawAllNodes()
 }
 
 function deleteNode(node_index) {
   nodeToBeDeleted=node_index;
+}
+
+function renameNode(node_index) {
+  var temp_name=prompt("Choose name :",nodes[node_index].name);
+  if (temp_name!=null) {
+    nodes[node_index].name=temp_name;
+  }
+  drawAllNodes()
+  contextActions=[]
+  contextBox=[]
 }
 
 function newConection(conection) {
@@ -202,6 +396,7 @@ function editNewConection(dummy) {
   isMakingConection = true;
   contextActions=[]
   contextBox=[]
+  drawAllNodes()
 }
 
 function drawNewConection(node_index,mouse_pos) {
@@ -244,11 +439,15 @@ function changeColor(node) {
   drawAllNodes()
 }
 
-function newNode(name_and_pos) {
-  const name=name_and_pos.name;
-  var pos=name_and_pos.pos;
-  //subMenu = true;
-  nodes.push({pos:pos,outputs:[],name:name,color:getRandomHexRGB(),size:{x:200,y:100}});
+function newNode(dict) {
+  const name=dict.name;
+  const pos=dict.pos;
+  const type=dict.type;
+  var settings="";
+  if ('settings' in dict) {
+    settings=dict.settings;
+  }
+  nodes.push({pos:pos,outputs:[],name:name,color:getRandomHexRGB(),size:{x:200,y:100},type:type,content:"",settings:settings});
   if (nodes.length === 1) {
     currentNode=0;
   }
@@ -273,9 +472,9 @@ canvas.addEventListener('mousedown', (event) => {
       if (startX >= contextBox[i][0] && startX <= contextBox[i][1] && startY >= contextBox[i][2] && startY <= contextBox[i][3]) {
         // Context menu
         voidClick=false;
-        console.log(contextBox)
-        console.log(contextActions[i])
-        console.log(i)
+        //console.log(contextBox)
+        //console.log(contextActions[i])
+        //console.log(i)
         for (var j = 0; j < contextActions[i].length; j++) {
           if (Math.floor((startY-contextBox[i][2])/20) === j) {
             contextActions[i][j][0](contextActions[i][j][1])
@@ -308,6 +507,7 @@ canvas.addEventListener('mousedown', (event) => {
                 let j_copy=JSON.parse(JSON.stringify(nodes[i].outputs[j]));
                 conection=[i_copy,j_copy];
                 contextActions = [[[deleteConection,conection]]];
+                
             }
           }
         }
@@ -324,10 +524,19 @@ canvas.addEventListener('mousedown', (event) => {
           if (relativeY <= 20) {
               if (event.button === 2) {
                 contextBox=[]
-                drawContext({x:startX,y:startY,options:["🎨 Change color","🗑️ Delete node"],width:160})
-                contextActions = [[[changeColor,currentNode],[deleteNode,currentNode]]];
-                }
-              else {isDragging = true;}
+                drawContext({x:startX,y:startY,options:["🎨 Change color","✏️ Rename node","🗑️ Delete node"],width:160})
+                contextActions = [[[changeColor,currentNode],[renameNode,currentNode],[deleteNode,currentNode]]];
+              } else if (relativeX >= nodes[currentNode].size.x-94 && relativeY <= 20) {
+                // execute node
+                task_finished=0;
+                uploadGraph(currentNode)
+                clearInterval()
+                refreshInterval=500;
+                fetchData()
+                drawAllNodes()
+              } else {
+                isDragging = true;
+              }
           } else if (relativeX >= nodes[currentNode].size.x-10 && relativeY >= nodes[currentNode].size.y-10) {
             // resizing  
             isResizing = true;
@@ -338,9 +547,73 @@ canvas.addEventListener('mousedown', (event) => {
               drawContext({x:startX,y:startY,options:["➕ Add conection"],width:160});
               contextActions = [[[editNewConection,""]]];
             }
+          } else {
+            contextActions=[]
+            contextBox=[]
+          }
+          var node_type=nodes[currentNode].type;
+          // interact with nodes
+          switch (node_type) {
+            case 'source':
+              if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
+                console.log("source")
+                document.getElementById('upload_file').click()
+                uploadGraph(-1)
+              }
+              break;
+            case 'filter':
+              if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
+                var temp_settings=prompt("Set filter settings (e.g. Age > 25 & `First Name` == 'Alex') :",nodes[currentNode].settings);
+                if (temp_settings!=null) {
+                  nodes[currentNode].settings=temp_settings;
+                }
+                uploadGraph(-1)
+                drawAllNodes()
+              }
+              break;
+            case 'columns_select':
+              if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
+                var temp_settings=prompt("Select columns (e.g. Age, Country ) :",nodes[currentNode].settings);
+                if (temp_settings!=null) {
+                  nodes[currentNode].settings=temp_settings;
+                }
+                uploadGraph(-1)
+                drawAllNodes()
+              }
+            case 'concatenate':
+              if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
+                nodes[currentNode].settings.axis=1-nodes[currentNode].settings.axis;
+                console.log(nodes[currentNode].settings.axis)
+                uploadGraph(-1)
+                drawAllNodes()
+              }
+              if (relativeX >= 160 && relativeY>=30 && relativeX<=300 && relativeY<=54) {
+                switch (nodes[currentNode].settings.join) {
+                  case 'outer':
+                    nodes[currentNode].settings.join='inner';
+                    break;
+                  case 'inner':
+                    nodes[currentNode].settings.join='left';
+                    break;
+                  case 'left':
+                    nodes[currentNode].settings.join='right';
+                    break;
+                  case 'right':
+                    nodes[currentNode].settings.join='outer';
+                    break;
+                  default:
+                    console.log('Concatenation error')
+                    break;
+                }
+                uploadGraph(-1)
+                drawAllNodes()
+              }
+              break;
+            default:
+              console.log('Unknown node');
+              break;
           } 
         }
-
       }
       isMakingConection=false;
     }
@@ -350,7 +623,13 @@ canvas.addEventListener('mousedown', (event) => {
         contextBox=[]
         if (event.button === 2) {drawContext({x:startX,y:startY,options:["➕ Add new node"],width:160});}
         else {isDraggingSpace=true;}
-        contextActions = [[[drawContext,{x:startX+160,y:startY,options:["➕ Add new node"],width:160}]],[[newNode,{name:"new node",pos:[startX,startY]}]]];
+        contextActions = [[[drawContext,{x:startX+160,y:startY,options:["source node","filter node","columns select","concatenation"],width:140}]],
+        [
+          [newNode,{name:"source node",pos:[startX,startY],type:"source"}],
+          [newNode,{name:"filter node",pos:[startX,startY],type:"filter"}],
+          [newNode,{name:"columns selection node",pos:[startX,startY],type:"columns_select"}],
+          [newNode,{name:"concatenation node",pos:[startX,startY],type:"concatenate",settings:{axis:1,join:'outer'}}]
+        ]];
     }
     deleteNodeRoutine()
 });
@@ -371,8 +650,8 @@ canvas.addEventListener('mousemove', (event) => {
     if (isResizing) {
         nodes[currentNode].size.x = event.clientX - canvas.offsetLeft-nodes[currentNode].pos[0];
         nodes[currentNode].size.y = event.clientY - canvas.offsetTop-nodes[currentNode].pos[1]-20;
-        if (nodes[currentNode].size.x < 90) {
-            nodes[currentNode].size.x=90
+        if (nodes[currentNode].size.x < 200) {
+            nodes[currentNode].size.x=200
         }
         if (nodes[currentNode].size.y < 50) {
             nodes[currentNode].size.y=50
@@ -388,15 +667,7 @@ canvas.addEventListener('mouseup', () => {
     isDragging = false;
     isResizing = false;
     isDraggingSpace = false;
-    if (nodes.length != 0) {
-      fetch('/api/graph', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({nodes:nodes,uid:session_uid,current_node:currentNode})
-      })
-      .then(response => response.json())
-      .then(data => console.log(data));
-    }
+    uploadGraph(-1)
 });
 
 drawAllNodes()

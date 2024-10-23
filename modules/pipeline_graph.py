@@ -1,4 +1,7 @@
 import pandas as pd
+import glob
+import os
+import re
 
 class Node:
     def __init__(self):
@@ -6,6 +9,7 @@ class Node:
         self.outputs=[]
         self.nb_inputs=-1
         self.nb_outputs=-1
+        self.id=-1
     def add_output_node(self,output):
         if self.nb_outputs != -1 :
             assert len(self.outputs) <= self.nb_outputs
@@ -20,22 +24,24 @@ class Node:
             assert len(input0.outputs) <= input0.nb_outputs
         input0.outputs.append(self)
         self.inputs.append(input0)
+    def set_id(self,id):
+        self.id=id
+        return self
 
-class Graph:
-    def __init__(self,nodes=[],adj_matrix=[[]],endpoint=-1):
-        self.nodes=nodes
-        self.adj_matrix=adj_matrix
-        self.endpoint=endpoint
-    def compile0(self):
-        for i in range(len(nodes)):
-            for j in range(len(nodes)):
-                nodes[i].add_output_node(nodes[j])
-    def execute(self):
-        return nodes[endpoint].execute()
-
+# class Graph:
+#     def __init__(self,nodes=[],endpoint=-1):
+#         self.nodes=nodes
+#         self.adj_matrix=adj_matrix
+#         self.endpoint=endpoint
+#     def compile0(self):
+#         for i in range(len(nodes)):
+#             for j in range(len(nodes)):
+#                 nodes[i].add_output_node(nodes[j])
+#     def execute_recursive(self):
+#         return nodes[endpoint].execute()
 
 class ImportDF(Node):
-    def __init__(self, file_path, sheet_name : str="" , sep : str=",",index_col=None, header=None, orient='columns'):
+    def __init__(self, file_path, sheet_name : str="Sheet1" , sep : str="\\,|\\;",index_col=None, header='infer', orient='columns'):
         super().__init__()
         self.file_path=file_path
         self.sheet_name=sheet_name
@@ -43,29 +49,32 @@ class ImportDF(Node):
         self.file_ext=file_path.split(".")[-1]
         self.index_col=index_col
         self.header=header
-        self.names=names
-        self.df=None
+        # self.names=names
+        self.content=None
         self.orient=orient
+    def get_inputs(self):
+        return []
     def execute(self):
-        match self.ext:
+        match self.file_ext:
             case "csv":
-                df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header)
+                df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header, engine='python')
             case "tsv":
                 if self.sep == "," : self.sep='\t'
-                df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header)
+                df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header, engine='python')
             case "xlsx":
-                df = read_excel(self.file_path, sheet_name=self.sheet_name)
+                df = pd.read_excel(self.file_path, sheet_name=self.sheet_name)
             case "json":
-                df = read_json(self.file_path, orient=self.orient)
+                df = pd.read_json(self.file_path, orient=self.orient)
+        self.content=df
         return df
 
 class DFNode(Node):
     """for testing purposes"""
     def __init__(self,df):
         super().__init__()
-        self.df=df
+        self.content=df
     def execute(self):
-        return self.df
+        return self.content
 
 class DFFilter(Node):
     def __init__(self, filter : str):
@@ -73,9 +82,15 @@ class DFFilter(Node):
         self.nb_inputs=1
         self.nb_outputs=1
         self.filter=filter
+        self.content=None
     def execute(self):
         df=self.inputs[0].execute()
-        filtered_df=df.query(self.filter)
+        try :
+            filtered_df=df.query(self.filter)
+            self.content=filtered_df
+        except pd.errors.UndefinedVariableError:
+            self.content='error : undefined variable'
+            return None
         return filtered_df
 
 class DFColumnsSelect(Node):
@@ -84,19 +99,27 @@ class DFColumnsSelect(Node):
         self.columns=columns
         self.nb_inputs=1
         self.nb_outputs=1
+        self.content=None
     def execute(self):
         df=self.inputs[0].execute()
-        selected_columns=df[self.columns]
+        try :
+            selected_columns=df[self.columns]
+            self.content=selected_columns
+        except pd.errors.UndefinedVariableError:
+            self.content='error : undefined variable'
+            return None
         return selected_columns
 
 class ConcatenateDF(Node):
-    def __init__(self, axis : int):
+    def __init__(self, axis : int=0, join='outer'):
         super().__init__()
         self.axis = axis
+        self.join=join
     def execute(self):
         df_concat=self.inputs[0].execute()
         for i in range(1,len(self.inputs)):
-            df_concat = pd.concat([df_concat, self.inputs[i].execute()], axis=self.axis)
+            df_concat = pd.concat([df_concat, self.inputs[i].execute()], axis=self.axis, join=self.join)
+            self.content=df_concat
         return df_concat
 
 class DFPivotTable(Node):
@@ -111,6 +134,28 @@ class DFPivotTable(Node):
         p_table = pd.pivot_table(self.inputs[0].execute(), index=self.index, values=self.values, aggfunc=self.aggfunc)
         return p_table
 
+def parse_graph(node_list,session_dir):
+    pd.options.display.max_columns = None
+    pd.options.display.max_rows = None
+    graph=[]
+    for i in range(len(node_list)):
+        node=node_list[i]
+        match node['type']:
+            case 'source':
+                files=glob.glob(os.path.join(f"cache/{session_dir}", f"{i}.{node['settings']['file_ext']}"))
+                if len(files)>0 : graph.append(ImportDF(files[0]).set_id(i))
+            case 'filter':
+                graph.append(DFFilter(node['settings']).set_id(i))
+            case 'columns_select':
+                graph.append(DFColumnsSelect(re.split(r"\s*,\s*",node['settings'])).set_id(i))
+            case 'concatenate':
+                graph.append(ConcatenateDF(node['settings']['axis'],node['settings']['join']).set_id(i))
+    for i in range(len(graph)):
+        #print(node_list[i]['outputs'])
+        for j in node_list[i]['outputs']:
+            graph[i].add_output_node(graph[j])
+    return graph
+
 if __name__=="__main__":
     df1=pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
     df2=pd.DataFrame({'C': [1, 2, 3], 'D': [4, 5, 6]})
@@ -119,7 +164,7 @@ if __name__=="__main__":
     Concatenator=ConcatenateDF(axis=1)
     dfn1=DFNode(df1)
     dfn2=DFNode(df2)
-    Filter=DFFilter('C==2')
+    Filter=DFFilter('C==2 & A==1')
     Selector=DFColumnsSelect(['A'])
 
     # Graphs creation
