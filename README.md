@@ -3,6 +3,3 @@
   It's main inspiration is Dataiku DSS and it uses pandas and sklearn to process data in the backend.<br>
   <br>
   <img src="https://github.com/AlexandreBoult/AlexandreBoult/blob/main/media/auto_ml_1.png" alt="" title="">
-  ---
-  <img src="test.svg" alt="" title="">
-  ---
