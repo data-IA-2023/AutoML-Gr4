@@ -2,6 +2,8 @@ import pandas as pd
 import glob
 import os
 import re
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
 
 class Node:
     def __init__(self):
@@ -134,6 +136,39 @@ class DFPivotTable(Node):
         p_table = pd.pivot_table(self.inputs[0].execute(), index=self.index, values=self.values, aggfunc=self.aggfunc)
         return p_table
 
+class TestTrainSplit(Node):
+    def __init__(self,ratio : float=0.8, order : int=0, rd_state : int=0):
+        super().__init__()
+        self.content=None
+        self.ratio=float(ratio)
+        self.order=order
+        self.rd_state=rd_state
+    def execute(self):
+        X_train, X_test, y_train, y_test = train_test_split(self.inputs[0].execute(), self.inputs[1].execute(), test_size=1-self.ratio, random_state=self.rd_state)
+        self.content={'X_train':X_train, 'X_test':X_test, 'y_train':y_train, 'y_test':y_test}
+        return self.content
+
+class KNeighbors(Node):
+    def __init__(self,n_neighbors:int=5):
+        super().__init__()
+        self.n_neighbors=n_neighbors
+        self.input_dict={}
+        self.model=None
+        self.pred=None
+        self.content='' # just a placeholder for encapsulation purposes
+    def execute(self):
+        neigh = KNeighborsClassifier(n_neighbors=self.n_neighbors)
+        self.input_dict=self.inputs[0].execute()
+        neigh.fit(self.input_dict['X_train'],self.input_dict['y_train'])
+        self.model=neigh
+        return neigh
+    def predict(self):
+        assert self.model!=None
+        y_pred = knn.model.predict(self.input_dict['X_test'])
+        self.pred=y_pred
+        #print("Accuracy:", knn.model.score(self.input_dict['X_test'], self.input_dict['y_test']))
+        return y_pred
+
 def parse_graph(node_list,session_dir):
     pd.options.display.max_columns = None
     pd.options.display.max_rows = None
@@ -150,6 +185,8 @@ def parse_graph(node_list,session_dir):
                 graph.append(DFColumnsSelect(re.split(r"\s*,\s*",node['settings'])).set_id(i))
             case 'concatenate':
                 graph.append(ConcatenateDF(node['settings']['axis'],node['settings']['join']).set_id(i))
+            case 'test_train_split':
+                graph.append(TestTrainSplit(node['settings']['ratio'],node['settings']['order'],node['settings']['rd_state']).set_id(i))
     for i in range(len(graph)):
         #print(node_list[i]['outputs'])
         for j in node_list[i]['outputs']:
@@ -157,21 +194,22 @@ def parse_graph(node_list,session_dir):
     return graph
 
 if __name__=="__main__":
-    df1=pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
-    df2=pd.DataFrame({'C': [1, 2, 3], 'D': [4, 5, 6]})
+    from sklearn.datasets import load_iris
+    iris = load_iris()
+    X = pd.DataFrame(iris.data, columns=iris.feature_names)
+    y = pd.DataFrame(iris.target,columns=['target'])
+    
+    Xnode=DFNode(X)
+    ynode=DFNode(y)
 
     # Nodes definition
-    Concatenator=ConcatenateDF(axis=1)
-    dfn1=DFNode(df1)
-    dfn2=DFNode(df2)
-    Filter=DFFilter('C==2 & A==1')
-    Selector=DFColumnsSelect(['A'])
-
-    # Graphs creation
+    split=TestTrainSplit()
+    split.add_input_node(Xnode)
+    split.add_input_node(ynode)
     
-    dfn1.add_output_node(Concatenator)
-    dfn2.add_output_node(Concatenator)
-    Concatenator.add_output_node(Filter)
-    Filter.add_output_node(Selector)
+    knn=KNeighbors()
+    knn.add_input_node(split)
+    knn.execute()
+    # Graphs creation
+    print(knn.predict())
     # execute pipeline graph
-    print(Selector.execute())

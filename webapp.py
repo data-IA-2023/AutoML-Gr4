@@ -29,6 +29,11 @@ def root():
 def home():
     return render_template('index.html',url=url_for('root'))
 
+
+@app.route('/test', methods=["GET"])
+def test():
+    return render_template('test.html',url=url_for('root'))
+
 @app.route("/api/upload_graph", methods=["POST"])
 def post_example():
     """POST in server"""

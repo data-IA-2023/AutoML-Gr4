@@ -313,6 +313,41 @@ function drawNode(x, y, name, color, content, size, id, type, node_settings) {
         ctx.fillText(content_array[i], x+14, y+100+i*20)
       }
       break;
+    case 'test_train_split':
+      drawRectangle(x+10, y+30, 140, 24, 'black')
+      drawRectangle(x+12, y+32, 136, 20, 'grey')
+      ctx.fillStyle = "white";
+      ctx.fillText('Set ratio', x+14, y+48)
+      var settings_text = "ratio : " + node_settings.ratio + ", order : " + node_settings.order;
+      var settings_width=Math.floor(ctx.measureText(settings_text).width);
+      drawRectangle(x+10,y+56,settings_width+8,24,'black')
+      drawRectangle(x+12,y+58,settings_width+4,20,'grey')
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(settings_text, x+14, y+74)
+      content_array=content.slice(1, -1).split(/'X_train': |'X_test': |'y_train': |'y_test': |\n|,/).splice(1);
+      ctx.font = "bold 18px Courier New";
+      var content_width=0;
+      for (var i=0; i<content_array.length; i++) {
+        content_width=Math.max(ctx.measureText(content_array[i]).width,content_width);
+      }
+      // console.log(content_width)
+      content_width=Math.floor(content_width);
+      drawRectangle(x+10, y+82, content_width+8, 20*content_array.length+4, 'black')
+      for (var i=0; i<content_array.length; i++) {
+        if ((i)%2 === 0) {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'white')
+        } else {
+          drawRectangle(x+12, y+84+20*i, content_width+4, 20, 'rgb(240, 240, 240)')
+        }
+      }
+      ctx.fillStyle = "black";
+      for (var i=0; i<content_array.length; i++) {
+        ctx.fillText(content_array[i], x+14, y+100+i*20)
+      }
+      break;
+    case 'kneighbors':
+      break;
     default:
       console.log('Unknown node');
       break;
@@ -332,7 +367,6 @@ function drawAllNodes() {
     if (i != currentNode) {
         drawNode(nodes[i].pos[0], nodes[i].pos[1],nodes[i].name,nodes[i].color,nodes[i].content,nodes[i].size,i,nodes[i].type,nodes[i].settings);
     }
-    
     for (var j = 0; j < nodes[i].outputs.length; j++) {
       // draws cennections
       ctx.strokeStyle = "green"; // Set stroke color to green
@@ -351,10 +385,10 @@ function drawAllNodes() {
 }
 
 function drawContext(args) {
-    x=args.x
-    y=args.y
-    options=args.options
-    width=args.width
+    x=args.x;
+    y=args.y;
+    options=args.options;
+    width=args.width;
     drawRectangle(x-2, y-2, width+4, options.length*20+4, 'black')
     for (var i = 0; i < options.length; i++) {
       if ((i)%2 === 0){
@@ -384,8 +418,8 @@ function renameNode(node_index) {
     nodes[node_index].name=temp_name;
   }
   drawAllNodes()
-  contextActions=[]
-  contextBox=[]
+  contextActions=[];
+  contextBox=[];
 }
 
 function newConection(conection) {
@@ -394,8 +428,8 @@ function newConection(conection) {
 
 function editNewConection(dummy) {
   isMakingConection = true;
-  contextActions=[]
-  contextBox=[]
+  contextActions=[];
+  contextBox=[];
   drawAllNodes()
 }
 
@@ -426,8 +460,8 @@ function deleteNodeRoutine() {
     }
     nodeToBeDeleted=-1;
     currentNode=0;
-    contextActions=[]
-    contextBox=[]
+    contextActions=[];
+    contextBox=[];
     drawAllNodes()
   };
 }
@@ -580,6 +614,7 @@ canvas.addEventListener('mousedown', (event) => {
                 uploadGraph(-1)
                 drawAllNodes()
               }
+              break;
             case 'concatenate':
               if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
                 nodes[currentNode].settings.axis=1-nodes[currentNode].settings.axis;
@@ -609,6 +644,17 @@ canvas.addEventListener('mousedown', (event) => {
                 drawAllNodes()
               }
               break;
+            case 'test_train_split':
+              if (relativeX >= 10 && relativeY>=30 && relativeX<=150 && relativeY<=54) {
+                var temp_settings=prompt("Change ratio (e.g. 0.8) :",nodes[currentNode].settings.ratio);
+                if (temp_settings!=null) {
+                  var lines = temp_settings.split(" : ");
+                  nodes[currentNode].settings.ratio=temp_settings;
+                }
+                uploadGraph(-1)
+                drawAllNodes()
+              }
+              break;
             default:
               console.log('Unknown node');
               break;
@@ -623,12 +669,13 @@ canvas.addEventListener('mousedown', (event) => {
         contextBox=[]
         if (event.button === 2) {drawContext({x:startX,y:startY,options:["➕ Add new node"],width:160});}
         else {isDraggingSpace=true;}
-        contextActions = [[[drawContext,{x:startX+160,y:startY,options:["source node","filter node","columns select","concatenation"],width:140}]],
+        contextActions = [[[drawContext,{x:startX+160,y:startY,options:["source node","filter node","columns select","concatenation","test train split"],width:140}]],
         [
           [newNode,{name:"source node",pos:[startX,startY],type:"source"}],
           [newNode,{name:"filter node",pos:[startX,startY],type:"filter"}],
           [newNode,{name:"columns selection node",pos:[startX,startY],type:"columns_select"}],
-          [newNode,{name:"concatenation node",pos:[startX,startY],type:"concatenate",settings:{axis:1,join:'outer'}}]
+          [newNode,{name:"concatenation node",pos:[startX,startY],type:"concatenate",settings:{axis:1,join:'outer'}}],
+          [newNode,{name:"test train split node",pos:[startX,startY],type:"test_train_split",settings:{ratio:0.8,order:0,rd_state:0}}]
         ]];
     }
     deleteNodeRoutine()
