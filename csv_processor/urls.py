@@ -12,4 +12,6 @@ urlpatterns = [
     path('export/csv/<int:pk>/', views.export_csv, name='export_csv'),
     path('export/excel/<int:pk>/', views.export_excel, name='export_excel'),
     path('export/json/<int:pk>/', views.export_json, name='export_json'),
+    
+   
 ]

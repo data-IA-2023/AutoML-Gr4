@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
 
-{% block title %}تسجيل الدخول{% endblock %}
+{% block title %} Login {% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h2 class="text-center">تسجيل الدخول</h2>
+                <h2 class="text-center"> Login </h2>
             </div>
             <div class="card-body">
                 <form method="POST">
                     {% csrf_token %}
                     {{ form|crispy }}
                     <div class="d-grid gap-2">
-                        <button class="btn btn-primary" type="submit">تسجيل الدخول</button>
+                        <button class="btn btn-primary" type="submit">SignIN  </button>
                     </div>
                 </form>
                 <div class="border-top pt-3">
                     <small class="text-muted">
-                        ليس لديك حساب؟ <a class="ms-2" href="{% url 'register' %}">تسجيل حساب جديد</a>
+                        you do not have an accunt <a class="ms-2" href="{% url 'register' %}">New accunt</a>
                     </small>
                 </div>
             </div>

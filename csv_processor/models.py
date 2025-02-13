@@ -48,11 +48,15 @@ class CSVFile(models.Model):
         """
         Enregistre une nouvelle opération dans le journal des opérations
         """
-        Operation.objects.create(
-            csv_file=self,
-            operation_type=operation_type,
-            details=details
-        )
+        if not self.operations_log:
+            self.operations_log = []
+        
+        self.operations_log.append({
+            'operation': operation_type,
+            'details': details,
+            'timestamp': timezone.now().isoformat()
+        })
+        self.save()
 
     def record_view(self):
         """
@@ -73,3 +77,5 @@ class Operation(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+    
+

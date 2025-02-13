@@ -143,7 +143,7 @@
                             </div>
                         </div>
                     </div>
-
+                    
                     <!-- Navigation par onglets -->
                     <ul class="nav nav-tabs" role="tablist">
                         <li class="nav-item" role="presentation">
@@ -253,36 +253,25 @@
                         </div>
 
                         <!-- Onglet Statistiques -->
-                        <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">Colonne</th>
-                                            <th scope="col">Type</th>
-                                            <th scope="col">Valeurs uniques</th>
-                                            <th scope="col">Valeurs nulles</th>
-                                            <th scope="col">Minimum</th>
-                                            <th scope="col">Maximum</th>
-                                            <th scope="col">Moyenne</th>
-                                            <th scope="col">Médiane</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for column, stats in column_stats.items %}
-                                        <tr>
-                                            <td>{{ stats.name }}</td>
-                                            <td>{{ stats.type }}</td>
-                                            <td>{{ stats.unique_count }}</td>
-                                            <td>{{ stats.null_count }}</td>
-                                            <td>{{ stats.min|default:"N/A" }}</td>
-                                            <td>{{ stats.max|default:"N/A" }}</td>
-                                            <td>{{ stats.mean|default:"N/A" }}</td>
-                                            <td>{{ stats.median|default:"N/A" }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                        <div class="tab-pane fade" id="stats">
+                            <div class="row">
+                                {% for col, stats in column_stats.items %}
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h5 class="card-title mb-0">{{ col }}</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <dl class="row mb-0">
+                                                {% for key, value in stats.items %}
+                                                <dt class="col-sm-6">{{ key }}</dt>
+                                                <dd class="col-sm-6">{{ value }}</dd>
+                                                {% endfor %}
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
 
@@ -339,6 +328,7 @@
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
