@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'django.contrib.staticfiles',  # هذا موجود مرة واحدة فقط
     'users.apps.UsersConfig',
     'csv_processor.apps.CsvProcessorConfig',
     'crispy_forms',
@@ -90,6 +90,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
 # Internationalization
 LANGUAGE_CODE = 'fr'
 TIME_ZONE = 'UTC'
@@ -112,3 +113,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 LOGIN_URL = 'login'
+ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["123.45.67.89", "192.168.1.100", "localhost", "*"]

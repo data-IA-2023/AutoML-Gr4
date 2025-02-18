@@ -77,5 +77,7 @@ class Operation(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+        
+        
     
 

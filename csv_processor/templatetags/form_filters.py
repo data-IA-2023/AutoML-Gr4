@@ -28,3 +28,10 @@ def get_item(dictionary, key):
     Get an item from a dictionary safely.
     """
     return dictionary.get(key, "")
+from django import template
+
+register = template.Library()
+
+@register.filter
+def default_dict(value, key):
+    return value.get(key, None)

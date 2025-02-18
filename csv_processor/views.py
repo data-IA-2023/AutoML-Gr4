@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.conf import settings
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.views.decorators.http import require_POST
 import pandas as pd
 import numpy as np
 import json
@@ -34,6 +35,133 @@ def ensure_media_dirs():
     for directory in [csv_dir, export_dir, temp_dir]:
         os.makedirs(directory, exist_ok=True)
     return csv_dir, export_dir, temp_dir
+
+def generate_ai_suggestions(df):
+    """Analyze DataFrame and generate cleaning suggestions."""
+    suggestions = []
+    
+    # Check for missing values
+    for column in df.columns:
+        null_count = df[column].isnull().sum()
+        if null_count > 0:
+            if pd.api.types.is_numeric_dtype(df[column]):
+                suggestions.append({
+                    'column': column,
+                    'action': 'fill_mean',
+                    'reason': f'{null_count} valeurs manquantes dans la colonne numérique "{column}".'
+                })
+            else:
+                suggestions.append({
+                    'column': column,
+                    'action': 'fill_mode',
+                    'reason': f'{null_count} valeurs manquantes dans la colonne catégorielle "{column}".'
+                })
+    
+    # Check for duplicates
+    duplicate_rows = len(df) - len(df.drop_duplicates())
+    if duplicate_rows > 0:
+        suggestions.append({
+            'action': 'remove_duplicates',
+            'reason': f'{duplicate_rows} lignes dupliquées détectées.'
+        })
+    
+    # Check for outliers
+    for column in df.columns:
+        if pd.api.types.is_numeric_dtype(df[column]):
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            outlier_count = ((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR))).sum()
+            if outlier_count > 0:
+                suggestions.append({
+                    'column': column,
+                    'action': 'remove_outliers',
+                    'reason': f'{outlier_count} valeurs aberrantes dans la colonne "{column}".'
+                })
+    return suggestions
+
+@login_required
+@require_POST
+def ai_suggest_cleaning(request, pk):
+    """Generate AI suggestions and store them in the session."""
+    csv_file = get_object_or_404(CSVFile, pk=pk, user=request.user)
+    try:
+        delimiter = detect_delimiter(csv_file.file.path)
+        df = pd.read_csv(csv_file.file.path, delimiter=delimiter)
+        suggestions = generate_ai_suggestions(df)
+        request.session[f'ai_suggestions_{pk}'] = suggestions
+        messages.success(request, f'{len(suggestions)} suggestions générées.')
+    except Exception as e:
+        messages.error(request, f'Erreur lors de l\'analyse : {str(e)}')
+    return redirect('view_csv', pk=pk)
+
+@login_required
+@require_POST
+def apply_ai_suggestions(request, pk):
+    """Apply all AI-generated suggestions."""
+    csv_file = get_object_or_404(CSVFile, pk=pk, user=request.user)
+    suggestions = request.session.get(f'ai_suggestions_{pk}', [])
+    
+    if not suggestions:
+        messages.error(request, "Aucune suggestion à appliquer.")
+        return redirect('view_csv', pk=pk)
+    
+    try:
+        delimiter = detect_delimiter(csv_file.file.path)
+        df = pd.read_csv(csv_file.file.path, delimiter=delimiter)
+        operations_log = []
+        
+        for suggestion in suggestions:
+            action = suggestion['action']
+            column = suggestion.get('column')
+            
+            if action == 'fill_mean':
+                mean_val = df[column].mean()
+                df[column].fillna(mean_val, inplace=True)
+                operations_log.append(f"Remplissage des valeurs manquantes avec la moyenne ({mean_val:.2f}) dans {column}.")
+            
+            elif action == 'fill_mode':
+                mode_val = df[column].mode()[0]
+                df[column].fillna(mode_val, inplace=True)
+                operations_log.append(f"Remplissage des valeurs manquantes avec le mode ({mode_val}) dans {column}.")
+            
+            elif action == 'remove_duplicates':
+                initial_rows = len(df)
+                df = df.drop_duplicates()
+                removed = initial_rows - len(df)
+                operations_log.append(f"Suppression de {removed} lignes dupliquées.")
+            
+            elif action == 'remove_outliers':
+                Q1 = df[column].quantile(0.25)
+                Q3 = df[column].quantile(0.75)
+                IQR = Q3 - Q1
+                initial_rows = len(df)
+                df = df[~((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR)))]
+                removed = initial_rows - len(df)
+                operations_log.append(f"Suppression de {removed} valeurs aberrantes dans {column}.")
+        
+        # Save cleaned file
+        base_name = os.path.splitext(csv_file.title)[0]
+        new_filename = f'ai_clean_{base_name}_{datetime.now().strftime("%Y%m%d%H%M")}.csv'
+        new_path = os.path.join(settings.MEDIA_ROOT, 'csv_files', new_filename)
+        df.to_csv(new_path, index=False, sep=delimiter)
+        
+        # Create new CSVFile record
+        new_csv = CSVFile.objects.create(
+            user=request.user,
+            title=new_filename,
+            file=f'csv_files/{new_filename}',
+            rows_count=len(df),
+            columns_count=len(df.columns)
+        )
+        new_csv.log_operation('ai_clean', ' | '.join(operations_log))
+        messages.success(request, "Suggestions appliquées avec succès!")
+        return redirect('view_csv', pk=new_csv.pk)
+    
+    except Exception as e:
+        messages.error(request, f'Erreur lors de l\'application : {str(e)}')
+        return redirect('view_csv', pk=pk)
+
 
 @login_required
 def home(request):
@@ -94,6 +222,7 @@ def upload_csv(request):
 @login_required
 def view_csv(request, pk):
     csv_file = get_object_or_404(CSVFile, pk=pk, user=request.user)
+    ai_suggestions = request.session.get(f'ai_suggestions_{pk}', [])
     try:
         delimiter = detect_delimiter(csv_file.file.path)
         df = pd.read_csv(csv_file.file.path, delimiter=delimiter)
@@ -167,6 +296,7 @@ def view_csv(request, pk):
         csv_file.record_view()
         context = {
             'csv_file': csv_file,
+            'ai_suggestions': ai_suggestions,
             'columns': df.columns.tolist(),
             'cleaning_form': cleaning_form,
             'column_form': column_form,
