@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load form_filters %}
+
+{% block title %}Visualisation du fichier CSV{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="fil d'ariane">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'home' %}">Accueil</a></li>
+                    <li class="breadcrumb-item active">{{ csv_file.title }}</li>
+                </ol>
+            </nav>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0">{{ csv_file.title }}</h2>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-label="Menu d'exportation">
+                                <i class="fas fa-download me-1"></i>Exporter
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'export_csv' csv_file.pk %}">Format CSV</a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_excel' csv_file.pk %}">Format Excel</a></li>
+                                <li><a class="dropdown-item" href="{% url 'export_json' csv_file.pk %}">Format JSON</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Informations du fichier</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Nombre de lignes :</span>
+                                            <span class="badge bg-primary">{{ summary.rows }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Nombre de colonnes :</span>
+                                            <span class="badge bg-secondary">{{ summary.columns }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Cellules vides :</span>
+                                            <span class="badge bg-warning">{{ summary.null_cells }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Lignes dupliquées :</span>
+                                            <span class="badge bg-info">{{ summary.duplicate_rows }}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Taille du fichier :</span>
+                                            <span class="badge bg-success">{{ summary.memory_usage }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Actions disponibles</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        {% if request.GET.show_form == 'clean' %}
+                                            <form method="post" action="{% url 'clean_data' csv_file.pk %}" class="mb-2">
+                                                {% csrf_token %}
+                                                {{ cleaning_form|crispy }}
+                                                <div class="d-flex gap-2">
+                                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                                        <i class="fas fa-check me-2"></i>Appliquer
+                                                    </button>
+                                                    <a href="{% url 'view_csv' csv_file.pk %}" class="btn btn-secondary">
+                                                        <i class="fas fa-times me-2"></i>Annuler
+                                                    </a>
+                                                </div>
+                                            </form>
+                                        {% else %}
+                                            <a href="?show_form=clean" class="btn btn-outline-primary">
+                                                <i class="fas fa-broom me-2"></i>Nettoyer les données
+                                            </a>
+                                        {% endif %}
+
+                                        {% if request.GET.show_form == 'column' %}
+                                            <form method="post" action="{% url 'column_operation' csv_file.pk %}" class="mb-2">
+                                                {% csrf_token %}
+                                                {{ column_form|crispy }}
+                                                <div class="d-flex gap-2">
+                                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                                        <i class="fas fa-check me-2"></i>Appliquer
+                                                    </button>
+                                                    <a href="{% url 'view_csv' csv_file.pk %}" class="btn btn-secondary">
+                                                        <i class="fas fa-times me-2"></i>Annuler
+                                                    </a>
+                                                </div>
+                                            </form>
+                                        {% else %}
+                                            <a href="?show_form=column" class="btn btn-outline-secondary">
+                                                <i class="fas fa-columns me-2"></i>Gérer les colonnes
+                                            </a>
+                                        {% endif %}
+
+                                        {% if request.GET.show_form == 'delete_row' %}
+                                            <form method="post" action="{% url 'delete_row' csv_file.pk %}" class="mb-2">
+                                                {% csrf_token %}
+                                                <div class="mb-3">
+                                                    <label for="row_number" class="form-label">Numéro de ligne à supprimer</label>
+                                                    <input type="number" class="form-control" id="row_number" name="row_number" required min="0">
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                                        <i class="fas fa-trash me-2"></i>Supprimer
+                                                    </button>
+                                                    <a href="{% url 'view_csv' csv_file.pk %}" class="btn btn-secondary">
+                                                        <i class="fas fa-times me-2"></i>Annuler
+                                                    </a>
+                                                </div>
+                                            </form>
+                                        {% else %}
+                                            <a href="?show_form=delete_row" class="btn btn-outline-danger">
+                                                <i class="fas fa-trash me-2"></i>Supprimer une ligne
+                                            </a>
+                                        {% endif %}
+
+                                        <form action="{% url 'delete_csv' csv_file.pk %}" method="post" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce fichier ? Cette action est irréversible.')" aria-label="Supprimer le fichier">
+                                                <i class="fas fa-trash-alt me-2"></i>Supprimer le fichier
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Navigation par onglets -->
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#data" role="tab" aria-controls="data" aria-selected="true">
+                                <i class="fas fa-table me-1"></i>Données
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" data-bs-toggle="tab" href="#stats" role="tab" aria-controls="stats" aria-selected="false">
+                                <i class="fas fa-chart-bar me-1"></i>Statistiques
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" data-bs-toggle="tab" href="#visualizations" role="tab" aria-controls="visualizations" aria-selected="false">
+                                <i class="fas fa-chart-line me-1"></i>Visualisations
+                            </a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" data-bs-toggle="tab" href="#history" role="tab" aria-controls="history" aria-selected="false">
+                                <i class="fas fa-history me-1"></i>Historique
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Contenu des onglets -->
+                    <div class="tab-content mt-3">
+                        <!-- Onglet Données -->
+                        <div class="tab-pane fade show active" id="data" role="tabpanel" aria-labelledby="data-tab">
+                            <div class="table-responsive">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="text-muted">
+                                        Affichage des lignes {{ pagination.start_index }} à {{ pagination.end_index }} sur {{ pagination.total_rows }}
+                                    </div>
+                                </div>
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            {% for column in columns %}
+                                            <th>{{ column }}</th>
+                                            {% endfor %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in pagination.page.object_list %}
+                                        <tr>
+                                            {% for value in row %}
+                                            <td>{{ value }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                
+                                <!-- Pagination -->
+                                {% if pagination.total_pages > 1 %}
+                                <nav aria-label="Navigation des pages">
+                                    <ul class="pagination justify-content-center">
+                                        {% if pagination.page.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1" aria-label="Première page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ pagination.page.previous_page_number }}" aria-label="Page précédente">
+                                                <i class="fas fa-angle-left"></i>
+                                            </a>
+                                        </li>
+                                        {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                                        </li>
+                                        <li class="page-item disabled">
+                                            <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                                        </li>
+                                        {% endif %}
+
+                                        <li class="page-item active">
+                                            <span class="page-link">
+                                                Page {{ pagination.page.number }} sur {{ pagination.total_pages }}
+                                            </span>
+                                        </li>
+
+                                        {% if pagination.page.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ pagination.page.next_page_number }}" aria-label="Page suivante">
+                                                <i class="fas fa-angle-right"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ pagination.total_pages }}" aria-label="Dernière page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </a>
+                                        </li>
+                                        {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                                        </li>
+                                        <li class="page-item disabled">
+                                            <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Onglet Statistiques -->
+                        <div class="tab-pane fade" id="stats">
+                            <div class="row">
+                                {% for col, stats in column_stats.items %}
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h5 class="card-title mb-0">{{ col }}</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <dl class="row mb-0">
+                                                {% for key, value in stats.items %}
+                                                <dt class="col-sm-6">{{ key }}</dt>
+                                                <dd class="col-sm-6">{{ value }}</dd>
+                                                {% endfor %}
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Onglet Visualisations -->
+                        <div class="tab-pane fade" id="visualizations" role="tabpanel" aria-labelledby="visualizations-tab">
+                            <div class="row">
+                                {% if plots %}
+                                {% for plot in plots %}
+                                <div class="col-md-6 mb-4">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div id="plot-{{ forloop.counter }}" class="plot-container"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <div class="col-12">
+                                    <p class="text-muted text-center">Aucune visualisation disponible</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Onglet Historique -->
+                        <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                            {% if operations_log %}
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Date et heure</th>
+                                            <th scope="col">Type d'opération</th>
+                                            <th scope="col">Détails</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for operation in operations_log %}
+                                        <tr>
+                                            <td>{{ operation.timestamp|date:"d/m/Y H:i" }}</td>
+                                            <td>{{ operation.type }}</td>
+                                            <td>{{ operation.details }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>Aucune opération n'a encore été effectuée sur ce fichier.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% for plot in plots %}
+            var plotData = JSON.parse('{{ plot|safe }}');
+            Plotly.newPlot('plot-{{ forloop.counter }}', plotData.data, plotData.layout);
+        {% endfor %}
+    });
+</script>
+{% endblock %}
