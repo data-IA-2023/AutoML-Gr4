@@ -43,7 +43,7 @@ class Node:
 #         return nodes[endpoint].execute()
 
 class ImportDF(Node):
-    def __init__(self, file_path, sheet_name : str="Sheet1" , sep : str="\\,|\\;",index_col=None, header='infer', orient='columns'):
+    def __init__(self, file_path, sheet_name : str="Sheet1" , sep : str="",index_col=None, header='infer', orient='columns'):
         super().__init__()
         self.file_path=file_path
         self.sheet_name=sheet_name
@@ -59,9 +59,11 @@ class ImportDF(Node):
     def execute(self):
         match self.file_ext:
             case "csv":
-                df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header, engine='python')
+                if self.sep == "" :
+                    df = pd.read_csv(self.file_path, index_col=self.index_col, header=self.header, engine='python')
+                else : df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header, engine='python')
             case "tsv":
-                if self.sep == "," : self.sep='\t'
+                if self.sep == "" : self.sep='\t'
                 df = pd.read_csv(self.file_path, sep=self.sep, index_col=self.index_col, header=self.header, engine='python')
             case "xlsx":
                 df = pd.read_excel(self.file_path, sheet_name=self.sheet_name)
@@ -172,13 +174,14 @@ class KNeighbors(Node):
 def parse_graph(node_list,session_dir):
     pd.options.display.max_columns = None
     pd.options.display.max_rows = None
-    graph=[]
+    graph={}
     for i in range(len(node_list)):
         node=node_list[i]
         match node['type']:
             case 'source':
+                print(node['settings'])
                 files=glob.glob(os.path.join(f"cache/{session_dir}", f"{i}.{node['settings']['file_ext']}"))
-                if len(files)>0 : graph.append(ImportDF(files[0]).set_id(i))
+                if len(files)>0 : graph.append(ImportDF(files[0].set_id(i),sep=node['settings']['sep']))
             case 'filter':
                 graph.append(DFFilter(node['settings']).set_id(i))
             case 'columns_select':

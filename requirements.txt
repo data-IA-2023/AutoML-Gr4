@@ -12,3 +12,4 @@ pandas
 seaborn
 flask-cors
 openpyxl
+pytest-flask
